@@ -1,7 +1,10 @@
 package mapreduce
 
 import (
+	"os"
 	"hash/fnv"
+	"log"
+	"encoding/json"
 )
 
 // doMap does the job of a map worker: it reads one of the input files
@@ -40,6 +43,55 @@ func doMap(
 	//     err := enc.Encode(&kv)
 	//
 	// Remember to close the file after you have written all the values!
+	// open input file
+	inputFile, err := os.Open(inFile)
+	if err != nil {
+		log.Fatal("common map, open input file ", inFile, "error:", err)	
+	}
+
+	// close input file before function exit
+	defer inputFile.Close()
+
+	// get input files status, which incluse file size
+	fileInfo, err := inputFile.Stat()
+	if err != nil {
+		log.Fatal("common map, get inputFile stat", inFile, "error:", err)
+	}
+
+	// read files contents, trans to a string
+	data := make([]byte, fileInfo.Size())
+	_, err = inputFile.Read(data)
+	if err != nil {
+		log.Fatal("doMap: read input file ", inFile, " error: ", err)
+	}
+
+	// use mapF to make keyValues pairs
+	keyValues := mapF(inFile, string(data))
+	// use ihash function to map keyValue pairs to intermediate files
+	
+	// make a list of reduce file
+	// var reducesFiles []string
+	var reducesEncoder []*json.Encoder
+	for i:=0 ; i < nReduce; i++ {
+		fileName := reduceName(jobName, mapTaskNumber, i)
+		// reducesFiles = append(reducesFiles, fileName)
+		reduceFile, err := os.Create(fileName)
+		if err != nil {
+			log.Fatal("make reduce failes", fileName, "error", err)
+		}
+
+		defer reduceFile.Close()
+		reducesEncoder = append(reducesEncoder, json.NewEncoder(reduceFile))
+	}
+
+	for _, kv := range keyValues {
+		reduceInter := ihash(kv.Key) % uint32(nReduce)
+		reduces := reducesEncoder[reduceInter]
+		err := reduces.Encode(&kv)
+		if err != nil {
+			log.Fatal("do map encode error", err)
+		}
+	} 
 }
 
 func ihash(s string) uint32 {
