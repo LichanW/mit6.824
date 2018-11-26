@@ -70,7 +70,8 @@ func doMap(
 	// use ihash function to map keyValue pairs to intermediate files
 	
 	// make a list of reduce file
-	// var reducesFiles []string
+	// reduce file should be located at GFS(google file system)
+	// but for simple test, reduce file stored at local file system.
 	var reducesEncoder []*json.Encoder
 	for i:=0 ; i < nReduce; i++ {
 		fileName := reduceName(jobName, mapTaskNumber, i)
@@ -84,6 +85,7 @@ func doMap(
 		reducesEncoder = append(reducesEncoder, json.NewEncoder(reduceFile))
 	}
 
+	// map keyvalues to nReduces files
 	for _, kv := range keyValues {
 		reduceInter := ihash(kv.Key) % uint32(nReduce)
 		reduces := reducesEncoder[reduceInter]
